@@ -3,7 +3,7 @@ import { SplitText as e } from "gsap/SplitText";
 var t = "data-inview", n = "data-inview-state", r = `[${t}]`, i = "0px 0px 100% 0px", a = 6, o = 150, s = () => typeof window < "u" && typeof IntersectionObserver < "u" && typeof MutationObserver < "u", c = (e) => {
 	if (!e || typeof e != "object") return !1;
 	let t = e;
-	return typeof t.totalTime == "function" && typeof t.kill == "function" && typeof t.revert == "function";
+	return typeof t.totalTime == "function" && typeof t.kill == "function" && typeof t.revert == "function" && typeof t.pause == "function";
 }, l = (e) => !!e && (typeof e == "object" || typeof e == "function") && typeof e.then == "function", u = (e) => {
 	if (e === void 0) return 0;
 	let t = typeof e == "number" ? e : Number.parseFloat(e);
@@ -23,7 +23,7 @@ var t = "data-inview", n = "data-inview-state", r = `[${t}]`, i = "0px 0px 100% 
 	words: [...e.words],
 	chars: [...e.chars],
 	masks: [...e.masks]
-}), m = (e, t) => !e.scope || e.scope.contains(t), h = (e, t) => !e.scope || !t.scope || e.scope.contains(t.scope) || t.scope.contains(e.scope), g = (e) => e.getAttribute(t)?.trim() ?? "", _ = () => typeof document < "u" && !!document.fonts && document.fonts.status !== "loaded", v = (e) => {
+}), m = (e, t) => !e.scope || e.scope.contains(t), h = (e) => Math.max(0, -e.start), g = (e, t) => !e.scope || !t.scope || e.scope.contains(t.scope) || t.scope.contains(e.scope), _ = (e) => e.getAttribute(t)?.trim() ?? "", v = () => typeof document < "u" && !!document.fonts && document.fonts.status !== "loaded", y = (e) => {
 	if (e === "none") return !0;
 	let t = e.match(/^matrix(3d)?\((.+)\)$/);
 	if (!t?.[2]) return !1;
@@ -53,7 +53,7 @@ var t = "data-inview", n = "data-inview-state", r = `[${t}]`, i = "0px 0px 100% 
 		0
 	];
 	return n.length === r.length && n.every((e, t) => Math.abs(e - (r[t] ?? 0)) < 1e-6);
-}, y = (e) => {
+}, b = (e) => {
 	let t = [
 		...e.lines,
 		...e.words,
@@ -61,18 +61,19 @@ var t = "data-inview", n = "data-inview-state", r = `[${t}]`, i = "0px 0px 100% 
 	];
 	for (let e of t) {
 		let t = getComputedStyle(e);
-		if (t.opacity !== "1" || t.visibility !== "visible" || !v(t.transform) || t.filter !== "none" || t.clipPath !== "none") return !1;
+		if (t.opacity !== "1" || t.visibility !== "visible" || !y(t.transform) || t.filter !== "none" || t.clipPath !== "none") return !1;
 	}
 	for (let t of e.masks) {
 		let e = getComputedStyle(t);
-		if (e.opacity !== "1" || !v(e.transform)) return !1;
+		if (e.opacity !== "1" || !y(e.transform)) return !1;
 	}
 	return !0;
-}, b = class {
+}, x = class {
 	splitter = e;
 	registry = /* @__PURE__ */ new Map();
 	elements = /* @__PURE__ */ new Map();
 	triggerObservers = /* @__PURE__ */ new Map();
+	resetObservers = /* @__PURE__ */ new Map();
 	nearObserver;
 	resizeObserver;
 	mutationObserver;
@@ -99,7 +100,7 @@ var t = "data-inview", n = "data-inview-state", r = `[${t}]`, i = "0px 0px 100% 
 		};
 		if (!s()) return () => {};
 		let c = this.registry.get(e) ?? [];
-		if (c.some((e) => e.splitKey !== o.splitKey && h(e, o))) throw Error(`[inview] "${e}" a déjà une config de split différente sur les mêmes éléments. Un élément ne peut être découpé qu'une fois : utilise la même config de split, ou un autre nom.`);
+		if (c.some((e) => e.splitKey !== o.splitKey && g(e, o))) throw Error(`[inview] "${e}" a déjà une config de split différente sur les mêmes éléments. Un élément ne peut être découpé qu'une fois : utilise la même config de split, ou un autre nom.`);
 		c.push(o), this.registry.set(e, c), this.startMutationObserver();
 		for (let t of this.elements.values()) t.name === e && m(o, t.el) && this.attachRegistration(t, o);
 		let l = `[${t}="${CSS.escape(e)}"]`, f = [...(o.scope ?? document).querySelectorAll(l)];
@@ -119,7 +120,9 @@ var t = "data-inview", n = "data-inview-state", r = `[${t}]`, i = "0px 0px 100% 
 		else {
 			for (let e of [...this.elements.keys()]) this.untrack(e);
 			for (let e of this.triggerObservers.values()) e.disconnect();
-			this.triggerObservers.clear(), this.nearObserver?.disconnect(), this.nearObserver = void 0, this.resizeObserver?.disconnect(), this.resizeObserver = void 0, this.mutationObserver?.disconnect(), this.mutationObserver = void 0, cancelAnimationFrame(this.queueFrame), this.queueFrame = 0, this.queue.clear(), clearTimeout(this.resizeTimer), this.fontsBound && document.fonts.removeEventListener("loadingdone", this.onFontsLoaded), this.fontsBound = !1, this.splits = /* @__PURE__ */ new WeakMap(), this.played = /* @__PURE__ */ new WeakMap(), this.registry.clear();
+			this.triggerObservers.clear();
+			for (let e of this.resetObservers.values()) e.disconnect();
+			this.resetObservers.clear(), this.nearObserver?.disconnect(), this.nearObserver = void 0, this.resizeObserver?.disconnect(), this.resizeObserver = void 0, this.mutationObserver?.disconnect(), this.mutationObserver = void 0, cancelAnimationFrame(this.queueFrame), this.queueFrame = 0, this.queue.clear(), clearTimeout(this.resizeTimer), this.fontsBound && document.fonts.removeEventListener("loadingdone", this.onFontsLoaded), this.fontsBound = !1, this.splits = /* @__PURE__ */ new WeakMap(), this.played = /* @__PURE__ */ new WeakMap(), this.registry.clear();
 		}
 	}
 	attachRegistration(e, t) {
@@ -131,7 +134,7 @@ var t = "data-inview", n = "data-inview-state", r = `[${t}]`, i = "0px 0px 100% 
 			anim: void 0,
 			token: 0,
 			scrollY: 0
-		}), n || (this.getTriggerObserver(t.start).observe(e.el), t.split && !e.config && (e.config = t.split, e.hasLines = t.split.type.includes("lines")), t.split && this.getNearObserver().observe(e.el));
+		}), n || (this.getTriggerObserver(t.start).observe(e.el), t.replay && this.getResetObserver(h(t)).observe(e.el), t.split && !e.config && (e.config = t.split, e.hasLines = t.split.type.includes("lines")), t.split && this.getNearObserver().observe(e.el));
 	}
 	removeRegistration(e) {
 		let t = this.registry.get(e.name);
@@ -146,7 +149,7 @@ var t = "data-inview", n = "data-inview-state", r = `[${t}]`, i = "0px 0px 100% 
 		}
 	}
 	track(e) {
-		let t = g(e), n = this.registry.get(t)?.filter((t) => m(t, e));
+		let t = _(e), n = this.registry.get(t)?.filter((t) => m(t, e));
 		if (!n || n.length === 0 || this.elements.has(e)) return;
 		let r = this.splits.get(e), i = n.find((e) => e.split)?.split, a = {
 			el: e,
@@ -171,6 +174,7 @@ var t = "data-inview", n = "data-inview-state", r = `[${t}]`, i = "0px 0px 100% 
 		let t = this.elements.get(e);
 		if (t) {
 			for (let t of this.triggerObservers.values()) t.unobserve(e);
+			for (let t of this.resetObservers.values()) t.unobserve(e);
 			this.nearObserver?.unobserve(e), this.resizeObserver?.unobserve(e), this.queue.delete(t);
 			for (let n of t.regs.values()) n.token++, e.isConnected || n.anim?.kill();
 			this.elements.delete(e);
@@ -192,6 +196,13 @@ var t = "data-inview", n = "data-inview-state", r = `[${t}]`, i = "0px 0px 100% 
 			rootMargin: `0px 0px ${-e}% 0px`,
 			threshold: 0
 		}), this.triggerObservers.set(e, t)), t;
+	}
+	getResetObserver(e) {
+		let t = this.resetObservers.get(e);
+		return t || (t = new IntersectionObserver((t) => this.handleReset(e, t), {
+			rootMargin: `0px 0px ${e}% 0px`,
+			threshold: 0
+		}), this.resetObservers.set(e, t)), t;
 	}
 	getNearObserver() {
 		return this.nearObserver ||= (this.bindFonts(), new IntersectionObserver((e) => {
@@ -234,9 +245,22 @@ var t = "data-inview", n = "data-inview-state", r = `[${t}]`, i = "0px 0px 100% 
 			if (!r) continue;
 			let i = n.boundingClientRect;
 			if (i.width === 0 && i.height === 0) continue;
-			let a = n.rootBounds?.top ?? 0, o = n.rootBounds?.bottom ?? document.documentElement.clientHeight * (1 - e / 100), s = n.isIntersecting || i.bottom <= a, c = !n.isIntersecting && i.top >= o;
-			for (let [t, n] of r.regs) t.start === e && (s && !n.triggered ? this.trigger(r, t, n) : c && n.triggered && t.replay && window.scrollY < n.scrollY && (n.triggered = !1));
+			let a = n.rootBounds?.top ?? 0, o = n.isIntersecting || i.bottom <= a;
+			for (let [t, n] of r.regs) t.start === e && o && !n.triggered && this.trigger(r, t, n);
 			this.elements.has(t) && (this.needsObserver(r, e) || this.triggerObservers.get(e)?.unobserve(t), this.maybeRelease(r));
+		}
+	}
+	handleReset(e, t) {
+		for (let r of t) {
+			let t = this.elements.get(r.target);
+			if (!t || r.isIntersecting) continue;
+			let i = r.boundingClientRect;
+			if (i.width === 0 && i.height === 0) continue;
+			let a = r.rootBounds?.bottom ?? document.documentElement.clientHeight;
+			if (i.top < a) continue;
+			let o = !1;
+			for (let [n, r] of t.regs) n.replay && r.triggered && h(n) === e && (window.scrollY >= r.scrollY || (r.triggered = !1, r.anim?.pause(0), o = !0));
+			o && [...t.regs.values()].every((e) => !e.triggered) && t.el.setAttribute(n, "reset");
 		}
 	}
 	trigger(e, t, r) {
@@ -270,7 +294,7 @@ var t = "data-inview", n = "data-inview-state", r = `[${t}]`, i = "0px 0px 100% 
 		}));
 	}
 	processQueue() {
-		let e = performance.now() + a, t = _();
+		let e = performance.now() + a, t = v();
 		for (let n of [...this.queue]) {
 			if (performance.now() > e) break;
 			(!t || n.split) && (this.queue.delete(n), this.elements.has(n.el) && n.near && this.splitNow(n));
@@ -281,12 +305,12 @@ var t = "data-inview", n = "data-inview-state", r = `[${t}]`, i = "0px 0px 100% 
 		if (this.queue.delete(e), !e.config) return;
 		if (e.split) {
 			if (!e.dirty) return;
-			e.dirty = !1, e.splitBeforeFonts = _();
+			e.dirty = !1, e.splitBeforeFonts = v();
 			let t = e.split;
 			this.ownMutations(e.el, () => t.split());
 			return;
 		}
-		e.splitBeforeFonts = _();
+		e.splitBeforeFonts = v();
 		let t = e.config, n = this.splitter;
 		this.ownMutations(e.el, () => {
 			n.create(e.el, {
@@ -297,18 +321,18 @@ var t = "data-inview", n = "data-inview-state", r = `[${t}]`, i = "0px 0px 100% 
 	}
 	handleSplit(e, t) {
 		if (e.split = t, this.splits.set(e.el, t), e.splitCount += 1, e.fragments = p(t), !(e.splitCount === 1 || e.silent)) for (let [t, n] of e.regs) {
-			if (!n.triggered || !n.anim) continue;
-			let r = n.anim.totalTime(), i = n.finished;
+			if (!n.anim) continue;
+			let r = n.anim.totalTime(), i = n.finished, a = !n.triggered;
 			n.anim.revert();
-			let a = this.runCallback(e, t);
-			this.watch(e, t, n, a), n.anim?.totalTime(r), i && (n.finished = !0);
+			let o = this.runCallback(e, t);
+			this.watch(e, t, n, o), a ? n.anim?.pause(0) : n.anim?.totalTime(r), i && (n.finished = !0);
 		}
 	}
 	maybeRevert(e) {
 		let t = e.split;
 		if (!t || !this.elements.has(e.el)) return;
 		for (let [t, n] of e.regs) if (t.replay || !n.triggered || !n.finished) return;
-		if (!y(t)) return;
+		if (!b(t)) return;
 		let n = e.el.offsetHeight;
 		if (this.ownMutations(e.el, () => t.revert()), e.el.offsetHeight !== n) e.silent = !0, this.ownMutations(e.el, () => t.split()), e.silent = !1;
 		else {
@@ -342,7 +366,7 @@ var t = "data-inview", n = "data-inview-state", r = `[${t}]`, i = "0px 0px 100% 
 		for (let e of i) e.isConnected || this.untrack(e);
 		for (let e of n) e.isConnected && this.track(e);
 	}
-}, x = new b();
-export { b as n, x as t };
+}, S = new x();
+export { x as n, S as t };
 
 //# sourceMappingURL=core.js.map

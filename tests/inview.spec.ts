@@ -246,8 +246,20 @@ test.describe('replay sans boucle', () => {
     await page.waitForTimeout(1500)
     expect(await count(page, 'trigger again')).toBe(1)
 
+    // Remonter sans faire sortir l'élément de l'écran ne réarme pas.
     await placeTop(page, '#again', 5)
-    await page.waitForTimeout(150)
+    await page.waitForTimeout(300)
+    await placeTop(page, '#again', 50)
+    await page.waitForTimeout(300)
+    expect(await count(page, 'trigger again')).toBe(1)
+
+    // Sorti par le bas : réarmé et remis à l'état de départ de l'animation.
+    await placeTop(page, '#again', -10)
+    await expect(page.locator('#again')).toHaveAttribute('data-inview-state', 'reset')
+    const opacities = await page.$$eval('#again > div', (els) =>
+      els.map((el) => getComputedStyle(el).opacity),
+    )
+    for (const o of opacities) expect(o).toBe('0')
     await placeTop(page, '#again', 50)
     await expect.poll(() => count(page, 'trigger again')).toBe(2)
     await page.waitForTimeout(1500)
@@ -272,4 +284,23 @@ test('vue : inview.on dans un composant vise ses éléments, même nom réutilis
   await expect.poll(regs).toBe(0)
   await page.click('#toggle')
   for (const id of ids) await expect.poll(() => count(page, `trigger ${id}`)).toBe(2)
+})
+
+test('replay : remis à l’état de départ une fois sorti de l’écran, pas avant', async ({ page }) => {
+  await page.goto('/replay.html')
+  await placeTop(page, '#replay', 50)
+  await expect.poll(() => count(page, 'trigger replay')).toBe(1)
+  await page.waitForTimeout(900)
+  const opacity = () => page.locator('#replay').evaluate((el) => getComputedStyle(el).opacity)
+
+  await placeTop(page, '#replay', 5)
+  await page.waitForTimeout(300)
+  expect(await opacity()).toBe('1')
+
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await expect(page.locator('#replay')).toHaveAttribute('data-inview-state', 'reset')
+  expect(await opacity()).toBe('0')
+
+  await placeTop(page, '#replay', 50)
+  await expect.poll(() => count(page, 'trigger replay')).toBe(2)
 })

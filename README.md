@@ -15,7 +15,7 @@ Pour ça, garde ScrollTrigger ou les CSS scroll-driven animations.
 ## Installation
 
 ```sh
-pnpm add github:ccadran/inview#v0.2.0 gsap
+pnpm add github:ccadran/inview#v0.3.0 gsap
 ```
 
 `gsap` est une dépendance « peer » : inview utilise le SplitText de ton projet, il n'est pas copié dans la
@@ -69,12 +69,12 @@ Le callback part quand le **haut de l'élément** franchit cette ligne.
 
 ## Options
 
-| Option   | Type              | Défaut  | Rôle                                                                                                                   |
-| -------- | ----------------- | ------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `start`  | `number \| '20%'` | `0`     | Position de la ligne de déclenchement (voir ci-dessus).                                                                |
-| `replay` | `boolean`         | `false` | Rejoue le callback à chaque passage : quand tu remontes la page et que l'élément repasse sous la ligne, il est réarmé. |
-| `split`  | `SplitOptions`    | —       | Découpe le texte avant l'animation (voir [Découper du texte](#découper-du-texte)).                                     |
-| `scope`  | `Element`         | page    | Ne vise que les éléments contenus dans cet élément. Avec Vue, automatique dans un composant (voir plus bas).           |
+| Option   | Type              | Défaut  | Rôle                                                                                                         |
+| -------- | ----------------- | ------- | ------------------------------------------------------------------------------------------------------------ |
+| `start`  | `number \| '20%'` | `0`     | Position de la ligne de déclenchement (voir ci-dessus).                                                      |
+| `replay` | `boolean`         | `false` | Rejoue le callback à chaque passage (voir [Rejouer avec `replay`](#rejouer-avec-replay)).                    |
+| `split`  | `SplitOptions`    | —       | Découpe le texte avant l'animation (voir [Découper du texte](#découper-du-texte)).                           |
+| `scope`  | `Element`         | page    | Ne vise que les éléments contenus dans cet élément. Avec Vue, automatique dans un composant (voir plus bas). |
 
 Les options sont facultatives : `inview.on('title', callback)` suffit.
 
@@ -103,8 +103,43 @@ Tu y fais ce que tu veux : ajouter une classe, lancer une animation GSAP, WAAPI,
 Comme le callback peut être rappelé après un resize, il ne doit faire **que** créer l'animation
 (pas de compteur, pas d'appel réseau…).
 
-Avec `replay`, si le callback avait renvoyé une animation GSAP, elle est arrêtée avant d'être rejouée :
-deux animations ne se battent jamais sur les mêmes éléments.
+## Rejouer avec `replay`
+
+Avec `replay: true`, voici ce qui se passe à chaque aller-retour :
+
+1. **En descendant**, l'élément franchit la ligne : le callback est appelé.
+2. **En remontant**, quand l'élément est **entièrement sorti de l'écran par le bas**, il est réarmé et
+   remis à l'état de départ. Tant qu'il est encore visible, rien ne bouge : la remise à zéro ne se voit jamais.
+3. **En redescendant**, il recroise la ligne : le callback est rappelé et l'animation repart.
+
+La remise à l'état de départ dépend de ce que renvoie ton callback :
+
+| Le callback renvoie… | Remise à zéro                                                                                                                                           |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| une animation GSAP   | Automatique : l'animation est ramenée à son début (l'état `from` d'un `fromTo` ou d'un `from`). Avec un texte découpé, ça marche aussi après un resize. |
+| autre chose ou rien  | À toi de la faire en CSS : `data-inview-state` passe à `"reset"` (voir ci-dessous).                                                                     |
+
+Exemple sans GSAP, piloté uniquement par l'attribut :
+
+```css
+[data-inview="fade"] {
+  opacity: 0;
+  transition: opacity 0.6s;
+}
+[data-inview="fade"][data-inview-state="triggered"] {
+  opacity: 1;
+}
+```
+
+Trois garanties :
+
+- L'élément n'est réarmé que si **tu as remonté la page**. Une animation qui déplace elle-même l'élément
+  (`y: 60`, `yPercent: 100`…) ne le relance jamais en boucle.
+- L'ancienne animation est arrêtée avant d'être rejouée : deux animations ne se battent jamais sur les
+  mêmes éléments.
+- Avec `replay`, le texte découpé n'est jamais restauré : il est gardé pour les passages suivants.
+
+Si la ligne est sous l'écran (`start` négatif), la remise à zéro a lieu quand l'élément repasse sous la ligne.
 
 ## Découper du texte
 
@@ -147,8 +182,13 @@ Ce que la lib gère pour toi :
 
 ## Éviter le flash
 
-Juste avant d'appeler ton callback, inview ajoute `data-inview-state="triggered"` sur l'élément.
-L'attribut reste en place ensuite, même avec `replay`.
+inview pose un attribut `data-inview-state` sur l'élément :
+
+| Valeur      | Quand                                                                         |
+| ----------- | ----------------------------------------------------------------------------- |
+| absent      | Pas encore déclenché.                                                         |
+| `triggered` | Posé juste avant l'appel du callback.                                         |
+| `reset`     | Avec `replay` : l'élément est sorti par le bas et attend le prochain passage. |
 
 Tant qu'il est absent, cache l'élément :
 
@@ -234,8 +274,6 @@ export default defineNuxtPlugin(() => {
   déjà présents sont pris en compte.
 - Sans `replay`, un élément est déclenché une seule fois, même s'il est retiré puis remis dans la page
   (`<KeepAlive>`, déplacement par Vue).
-- Avec `replay`, l'élément n'est réarmé que si tu remontes la page. Une animation qui déplace elle-même
-  l'élément sous la ligne (`y: 60`, `yPercent: 100`…) ne le relance donc pas en boucle.
 - Limite connue : un saut de scroll instantané qui fait passer un élément directement de sous la ligne à
   au-dessus de l'écran (clic sur une ancre, `scrollTo` sans animation) ne le déclenche pas.
 - Côté serveur, `on()` ne fait rien : tu peux importer la lib n'importe où.

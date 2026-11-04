@@ -5,6 +5,8 @@ export declare class Inview {
     private readonly registry;
     private readonly elements;
     private readonly triggerObservers;
+    /** Détection de la sortie par le bas (replay), par marge basse en %. */
+    private readonly resetObservers;
     private nearObserver;
     private resizeObserver;
     private mutationObserver;
@@ -38,12 +40,18 @@ export declare class Inview {
     private maybeRelease;
     private needsObserver;
     private getTriggerObserver;
+    private getResetObserver;
     private getNearObserver;
     private getResizeObserver;
     private bindFonts;
     private markLinesDirty;
     private enqueueDirtyNear;
     private handleTrigger;
+    /**
+     * Replay : quand l'élément est entièrement sorti par le bas (ou repassé sous une ligne située sous l'écran),
+     * il est réarmé et son animation remise à son état de départ, sans que ce soit visible.
+     */
+    private handleReset;
     private trigger;
     private runCallback;
     /** Mémorise le retour du callback et attend sa fin pour, éventuellement, annuler le split. */

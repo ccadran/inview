@@ -1,6 +1,6 @@
 {
   "name": "@ccadran/inview",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Déclenche des callbacks quand des éléments entrent dans le viewport, via IntersectionObserver. Split de texte intégré (GSAP SplitText) et composable Vue.",
   "license": "MIT",
   "author": "ccadran",

@@ -34,6 +34,7 @@ interface GsapAnimation {
   totalTime(value: number): unknown
   kill(): unknown
   revert(): unknown
+  pause(atTime?: number): unknown
 }
 
 interface RegState {
@@ -79,7 +80,8 @@ const isGsapAnimation = (value: unknown): value is GsapAnimation => {
   return (
     typeof v.totalTime === 'function' &&
     typeof v.kill === 'function' &&
-    typeof v.revert === 'function'
+    typeof v.revert === 'function' &&
+    typeof v.pause === 'function'
   )
 }
 
@@ -119,6 +121,9 @@ const fragmentsOf = (split: SplitTextInstance): Omit<InviewItem, 'el'> => ({
 })
 
 const inScope = (reg: Registration, el: Element): boolean => !reg.scope || reg.scope.contains(el)
+
+/** Marge de détection de sortie : l'écran, prolongé jusqu'à la ligne si elle est sous l'écran. */
+const resetMarginOf = (reg: Registration): number => Math.max(0, -reg.start)
 
 const scopesOverlap = (a: Registration, b: Registration): boolean =>
   !a.scope || !b.scope || a.scope.contains(b.scope) || b.scope.contains(a.scope)
@@ -165,6 +170,8 @@ export class Inview {
   private readonly registry = new Map<string, Registration[]>()
   private readonly elements = new Map<HTMLElement, ElementState>()
   private readonly triggerObservers = new Map<number, IntersectionObserver>()
+  /** Détection de la sortie par le bas (replay), par marge basse en %. */
+  private readonly resetObservers = new Map<number, IntersectionObserver>()
   private nearObserver: IntersectionObserver | undefined
   private resizeObserver: ResizeObserver | undefined
   private mutationObserver: MutationObserver | undefined
@@ -259,6 +266,8 @@ export class Inview {
     for (const el of [...this.elements.keys()]) this.untrack(el)
     for (const io of this.triggerObservers.values()) io.disconnect()
     this.triggerObservers.clear()
+    for (const io of this.resetObservers.values()) io.disconnect()
+    this.resetObservers.clear()
     this.nearObserver?.disconnect()
     this.nearObserver = undefined
     this.resizeObserver?.disconnect()
@@ -290,6 +299,7 @@ export class Inview {
     })
     if (alreadyPlayed) return
     this.getTriggerObserver(reg.start).observe(state.el)
+    if (reg.replay) this.getResetObserver(resetMarginOf(reg)).observe(state.el)
     if (reg.split && !state.config) {
       state.config = reg.split
       state.hasLines = reg.split.type.includes('lines')
@@ -357,6 +367,7 @@ export class Inview {
     const state = this.elements.get(el)
     if (!state) return
     for (const io of this.triggerObservers.values()) io.unobserve(el)
+    for (const io of this.resetObservers.values()) io.unobserve(el)
     this.nearObserver?.unobserve(el)
     this.resizeObserver?.unobserve(el)
     this.queue.delete(state)
@@ -393,6 +404,18 @@ export class Inview {
         threshold: 0,
       })
       this.triggerObservers.set(start, io)
+    }
+    return io
+  }
+
+  private getResetObserver(margin: number): IntersectionObserver {
+    let io = this.resetObservers.get(margin)
+    if (!io) {
+      io = new IntersectionObserver((entries) => this.handleReset(margin, entries), {
+        rootMargin: `0px 0px ${margin}% 0px`,
+        threshold: 0,
+      })
+      this.resetObservers.set(margin, io)
     }
     return io
   }
@@ -476,27 +499,46 @@ export class Inview {
       if (rect.width === 0 && rect.height === 0) continue
 
       const lineTop = entry.rootBounds?.top ?? 0
-      const lineBottom =
-        entry.rootBounds?.bottom ?? document.documentElement.clientHeight * (1 - start / 100)
       // Atteint = a franchi la ligne, ou se trouve déjà entièrement au-dessus de l'écran (scroll restauré).
       const reached = entry.isIntersecting || rect.bottom <= lineTop
-      // Repassé sous la ligne (on remonte) : condition de réarmement pour replay.
-      const below = !entry.isIntersecting && rect.top >= lineBottom
 
       for (const [reg, rs] of state.regs) {
-        if (reg.start !== start) continue
-        if (reached && !rs.triggered) this.trigger(state, reg, rs)
-        // Réarmement seulement si l'utilisateur est remonté : une animation qui déplace
-        // l'élément sous la ligne (y: 60…) ne doit pas le redéclencher en boucle.
-        else if (below && rs.triggered && reg.replay && window.scrollY < rs.scrollY) {
-          rs.triggered = false
-        }
+        if (reg.start === start && reached && !rs.triggered) this.trigger(state, reg, rs)
       }
 
       // L'élément a peut-être été retiré par le callback lui-même.
       if (!this.elements.has(el)) continue
       if (!this.needsObserver(state, start)) this.triggerObservers.get(start)?.unobserve(el)
       this.maybeRelease(state)
+    }
+  }
+
+  /**
+   * Replay : quand l'élément est entièrement sorti par le bas (ou repassé sous une ligne située sous l'écran),
+   * il est réarmé et son animation remise à son état de départ, sans que ce soit visible.
+   */
+  private handleReset(margin: number, entries: IntersectionObserverEntry[]): void {
+    for (const entry of entries) {
+      const state = this.elements.get(entry.target as HTMLElement)
+      if (!state || entry.isIntersecting) continue
+      const rect = entry.boundingClientRect
+      if (rect.width === 0 && rect.height === 0) continue
+      const bottom = entry.rootBounds?.bottom ?? document.documentElement.clientHeight
+      if (rect.top < bottom) continue
+
+      let reset = false
+      for (const [reg, rs] of state.regs) {
+        if (!reg.replay || !rs.triggered || resetMarginOf(reg) !== margin) continue
+        // Seulement si l'utilisateur est remonté : une animation qui déplace elle-même l'élément
+        // vers le bas ne doit pas le réarmer.
+        if (window.scrollY >= rs.scrollY) continue
+        rs.triggered = false
+        rs.anim?.pause(0)
+        reset = true
+      }
+      if (reset && [...state.regs.values()].every((rs) => !rs.triggered)) {
+        state.el.setAttribute(STATE_ATTR, 'reset')
+      }
     }
   }
 
@@ -606,16 +648,18 @@ export class Inview {
     state.fragments = fragmentsOf(self)
     if (state.splitCount === 1 || state.silent) return
 
-    // Redécoupage : seuls les callbacks déjà joués qui ont renvoyé une animation GSAP sont rappelés,
-    // avec les nouveaux fragments, puis remis à la même progression.
+    // Redécoupage : seuls les callbacks qui ont renvoyé une animation GSAP sont rappelés, avec les
+    // nouveaux fragments, puis remis à la même progression (ou à leur départ s'ils ont été réarmés).
     for (const [reg, rs] of state.regs) {
-      if (!rs.triggered || !rs.anim) continue
+      if (!rs.anim) continue
       const time = rs.anim.totalTime()
       const wasFinished = rs.finished
+      const armed = !rs.triggered
       rs.anim.revert()
       const result = this.runCallback(state, reg)
       this.watch(state, reg, rs, result)
-      rs.anim?.totalTime(time)
+      if (armed) rs.anim?.pause(0)
+      else rs.anim?.totalTime(time)
       if (wasFinished) rs.finished = true
     }
   }
