@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>inview · dynamic</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <p>
+        <button id="add" type="button">Injecter 3 cartes</button>
+        <button id="clear" type="button">Tout retirer</button>
+        <button id="late" type="button">on("late") maintenant</button>
+      </p>
+      <div class="block" data-inview="late" id="late-el">Présent avant son on()</div>
+      <section id="list"></section>
+      <div class="spacer"></div>
+    </main>
+    <script type="module">
+      import { inview } from '@ccadran/inview'
+      import { log } from './shared.ts'
+
+      let count = 0
+      inview.on('card', ({ el }) => {
+        log(`trigger ${el.id}`)
+        el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 400 })
+      })
+
+      const list = document.querySelector('#list')
+      document.querySelector('#add').addEventListener('click', () => {
+        for (let i = 0; i < 3; i++) {
+          const card = document.createElement('div')
+          card.className = 'block'
+          card.dataset.inview = 'card'
+          card.id = `card-${++count}`
+          card.textContent = card.id
+          list.append(card)
+        }
+      })
+      document.querySelector('#clear').addEventListener('click', () => list.replaceChildren())
+      document.querySelector('#late').addEventListener('click', () => {
+        inview.on('late', ({ el }) => log(`trigger ${el.id}`))
+      })
+      window.inview = inview
+    </script>
+  </body>
+</html>

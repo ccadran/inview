@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>inview · basic</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <div class="block" data-inview="visible" id="visible">Visible au chargement</div>
+      <div class="spacer">↓ scroll</div>
+      <div class="block big" data-inview="start0" id="start0">start 0 %</div>
+      <div class="spacer"></div>
+      <div class="block big" data-inview="start30" id="start30">start 30 %</div>
+      <div class="spacer"></div>
+      <div class="block big" data-inview="startNeg" id="startNeg">start -20 % (avant l'écran)</div>
+      <div class="spacer"></div>
+      <div class="block" data-inview="orphan" id="orphan">Sans callback : jamais déclenché</div>
+      <div class="spacer"></div>
+    </main>
+    <script type="module">
+      import { inview } from '@ccadran/inview'
+      import { drawStartLine, log } from './shared.ts'
+
+      drawStartLine(30)
+      // ?bottom : simule un scroll restauré en bas de page avant l'enregistrement.
+      if (new URLSearchParams(location.search).has('bottom')) window.scrollTo(0, document.body.scrollHeight)
+      const reveal = ({ el }) => {
+        log(`trigger ${el.id}`)
+        el.animate([{ opacity: 0, transform: 'translateY(40px)' }, { opacity: 1, transform: 'none' }], {
+          duration: 600,
+          easing: 'cubic-bezier(.2,.8,.2,1)',
+        })
+      }
+
+      inview.on('visible', reveal)
+      inview.on('start0', { start: 0 }, reveal)
+      inview.on('start30', { start: '30%' }, reveal)
+      inview.on('startNeg', { start: -20 }, reveal)
+      window.inview = inview
+    </script>
+  </body>
+</html>

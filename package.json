@@ -1,0 +1,46 @@
+{
+  "name": "@ccadran/inview",
+  "version": "0.1.0",
+  "description": "Déclenche des callbacks quand des éléments entrent dans le viewport, via IntersectionObserver. Split de texte optionnel avec GSAP SplitText.",
+  "license": "MIT",
+  "author": "ccadran",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/inview.js",
+  "module": "./dist/inview.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/inview.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite --config vite.playground.config.ts",
+    "build": "vite build && tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit && biome check .",
+    "format": "biome check --write .",
+    "test": "playwright test",
+    "bench": "node tests/bench.mjs"
+  },
+  "peerDependencies": {
+    "gsap": "^3.13.0"
+  },
+  "peerDependenciesMeta": {
+    "gsap": {
+      "optional": true
+    }
+  },
+  "packageManager": "pnpm@10.28.0",
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.4",
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^26.6.6",
+    "gsap": "^3.15.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5"
+  }
+}

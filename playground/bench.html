@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>inview · bench</title>
+    <style>
+      body { margin: 0; font: 18px/1.5 system-ui, sans-serif; }
+      main { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+      [data-inview]:not([data-inview-state]) { visibility: hidden; }
+    </style>
+  </head>
+  <body>
+    <main id="main"></main>
+    <script type="module">
+      import { inview } from '@ccadran/inview'
+      import gsap from 'gsap'
+      import { SplitText } from 'gsap/SplitText'
+
+      window.inview = inview
+      window.gsap = gsap
+      window.SplitText = SplitText
+      window.__long = []
+      new PerformanceObserver((l) => {
+        for (const e of l.getEntries()) window.__long.push(Math.round(e.duration))
+      }).observe({ type: 'longtask', buffered: true })
+
+      const words = 'lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua'.split(' ')
+      window.makeParagraphs = (n, name, wordsPer = 60) => {
+        const frag = document.createDocumentFragment()
+        for (let i = 0; i < n; i++) {
+          const p = document.createElement('p')
+          p.dataset.inview = name
+          p.id = `${name}-${i}`
+          p.textContent = Array.from({ length: wordsPer }, (_, j) => words[(i + j) % words.length]).join(' ')
+          frag.append(p)
+        }
+        document.querySelector('#main').append(frag)
+      }
+      window.ready = true
+    </script>
+  </body>
+</html>

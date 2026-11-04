@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>inview · replay</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <div class="spacer">↓ scroll, puis remonte et redescends</div>
+      <div class="block big" data-inview="replay" id="replay">replay: true</div>
+      <div class="block big" data-inview="once" id="once">replay: false</div>
+      <div class="spacer"></div>
+    </main>
+    <script type="module">
+      import { inview } from '@ccadran/inview'
+      import gsap from 'gsap'
+      import { drawStartLine, log } from './shared.ts'
+
+      drawStartLine(20)
+      const anim = ({ el }) => {
+        log(`trigger ${el.id}`)
+        return gsap.fromTo(el, { autoAlpha: 0, y: 60 }, { autoAlpha: 1, y: 0, duration: 0.6 })
+      }
+      inview.on('replay', { start: 20, replay: true }, anim)
+      inview.on('once', { start: 20 }, anim)
+      window.inview = inview
+    </script>
+  </body>
+</html>

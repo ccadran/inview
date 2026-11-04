@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>inview · split</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <div class="spacer">↓ scroll — redimensionne la fenêtre pendant ou après l'animation</div>
+      <p class="big" data-inview="title" id="title">
+        Le texte est découpé un écran avant d'arriver, puis animé ligne par ligne.
+      </p>
+      <div class="spacer"></div>
+      <p class="block" data-inview="css" id="css">
+        Ici aucune animation GSAP n'est renvoyée : une classe CSS pilote les mots via la variable
+        --word. Après un redécoupage, les nouveaux mots prennent directement leur état final.
+      </p>
+      <div class="spacer"></div>
+      <p class="block" data-inview="again" id="again">
+        Avec replay, le split est conservé pour pouvoir rejouer l'animation à chaque passage.
+      </p>
+      <div class="spacer"></div>
+    </main>
+    <style>
+      [data-inview='css'] .word {
+        opacity: 0.1;
+        transition: opacity 0.4s calc(var(--word) * 25ms);
+      }
+      [data-inview='css'].is-in .word {
+        opacity: 1;
+      }
+    </style>
+    <script type="module">
+      import { inview } from '@ccadran/inview'
+      import gsap from 'gsap'
+      import { SplitText } from 'gsap/SplitText'
+      import { log } from './shared.ts'
+
+      inview.use(SplitText)
+
+      inview.on('title', { start: 20, split: { type: 'lines', mask: 'lines' } }, ({ el, lines }) => {
+        log(`trigger ${el.id} (${lines.length} lignes)`)
+        return gsap.fromTo(lines, { yPercent: 100 }, { yPercent: 0, duration: 1.2, stagger: 0.12, ease: 'expo.out' })
+      })
+
+      inview.on(
+        'css',
+        { start: 20, split: { type: 'words', wordsClass: 'word', propIndex: true } },
+        ({ el, words }) => {
+          log(`trigger ${el.id} (${words.length} mots)`)
+          el.classList.add('is-in')
+        },
+      )
+      inview.on('again', { start: 20, replay: true, split: { type: 'lines' } }, ({ el, lines }) => {
+        log(`trigger ${el.id}`)
+        return gsap.fromTo(lines, { y: 30, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.4, stagger: 0.05 })
+      })
+      window.inview = inview
+    </script>
+  </body>
+</html>

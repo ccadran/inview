@@ -1,0 +1,105 @@
+:root {
+  --bg: #0e0e0e;
+  --fg: #f2f0eb;
+  --muted: #8a8780;
+  --accent: #ff5a1f;
+  --line: #2a2a2a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font:
+    400 18px / 1.5 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+/* État initial géré côté projet : caché tant que inview n'a pas déclenché. */
+[data-inview]:not([data-inview-state]) {
+  visibility: hidden;
+}
+
+.page {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.spacer {
+  height: 120vh;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  border-bottom: 1px dashed var(--line);
+}
+
+.block {
+  padding: 32px;
+  margin: 24px 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.big {
+  font-size: clamp(32px, 6vw, 72px);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+}
+
+.start-line {
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1px solid var(--accent);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.start-line span {
+  position: absolute;
+  right: 8px;
+  top: -22px;
+  font-size: 12px;
+  color: var(--accent);
+}
+
+#log {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  width: 260px;
+  max-height: 40vh;
+  overflow: auto;
+  padding: 10px 12px;
+  background: #000c;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font:
+    12px / 1.4 ui-monospace,
+    monospace;
+  z-index: 20;
+}
+
+nav a {
+  display: block;
+  padding: 12px 0;
+  color: var(--fg);
+}
+
+button {
+  font: inherit;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--fg);
+  background: none;
+  color: var(--fg);
+  cursor: pointer;
+}
