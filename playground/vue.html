@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>inview · vue</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <p><button id="toggle" type="button">Monter / démonter les composants</button></p>
+      <div id="app"></div>
+      <div class="spacer"></div>
+    </main>
+    <script type="module">
+      import { inview as coreInview } from '@ccadran/inview'
+      import { inview } from '@ccadran/inview/vue'
+      import gsap from 'gsap'
+      import { createApp, h, ref } from 'vue'
+      import { log } from './shared.ts'
+
+      // Le même composant monté 3 fois : chaque carte ne doit être animée qu'une fois.
+      const Card = {
+        props: { label: String },
+        setup(props) {
+          inview.on('title', { split: { type: 'words' } }, ({ el, words }) => {
+            log(`trigger ${el.dataset.id}`)
+            return gsap.fromTo(words, { autoAlpha: 0, y: 20 }, { autoAlpha: 1, y: 0, stagger: 0.03 })
+          })
+          return () =>
+            h('div', { class: 'block' }, [
+              h('p', { 'data-inview': 'title', 'data-id': props.label }, `Carte ${props.label} animée mot par mot`),
+            ])
+        },
+      }
+
+      // Un autre composant réutilise le nom "title" avec un autre split : aucun conflit.
+      const Hero = {
+        setup() {
+          inview.on('title', { split: { type: 'lines' } }, ({ el, lines }) => {
+            log(`trigger ${el.dataset.id} (${lines.length} lignes)`)
+            return gsap.fromTo(lines, { autoAlpha: 0 }, { autoAlpha: 1 })
+          })
+          return () => h('section', { class: 'block' }, [h('h2', { 'data-inview': 'title', 'data-id': 'hero' }, 'Hero')])
+        },
+      }
+
+      const visible = ref(true)
+      createApp({
+        setup: () => () =>
+          visible.value ? [h(Hero), ...['a', 'b', 'c'].map((label) => h(Card, { label, key: label }))] : null,
+      }).mount('#app')
+
+      document.querySelector('#toggle').addEventListener('click', () => {
+        visible.value = !visible.value
+      })
+      window.inview = coreInview
+    </script>
+  </body>
+</html>

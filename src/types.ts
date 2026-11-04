@@ -23,8 +23,10 @@ export interface InviewOptions {
   start?: StartValue
   /** Rejoue le callback quand l'élément repasse sous la ligne puis la recroise. Défaut : false. */
   replay?: boolean
-  /** Découpe le texte avec SplitText (enregistré via `inview.use(SplitText)`). */
+  /** Découpe le texte avec GSAP SplitText. */
   split?: SplitOptions
+  /** Limite cet enregistrement aux éléments contenus dans `scope` (par exemple la racine d'un composant). */
+  scope?: Element | null
 }
 
 /** Ce que reçoit le callback. Les tableaux sont vides si l'élément n'est pas découpé. */

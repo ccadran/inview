@@ -1,12 +1,16 @@
 import { defineConfig } from 'vite'
 
-// Build de la lib : un seul module ESM, sans dépendance embarquée.
+// Build de la lib : ESM, deux points d'entrée (cœur et Vue), dépendances externes.
 export default defineConfig({
   build: {
     lib: {
-      entry: 'src/index.ts',
+      entry: { inview: 'src/index.ts', vue: 'src/vue.ts' },
       formats: ['es'],
-      fileName: () => 'inview.js',
+      fileName: (_format, name) => `${name}.js`,
+    },
+    rolldownOptions: {
+      external: [/^gsap(\/.*)?$/, 'vue'],
+      output: { chunkFileNames: 'core.js' },
     },
     target: 'es2022',
     emptyOutDir: true,

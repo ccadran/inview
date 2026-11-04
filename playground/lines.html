@@ -10,7 +10,6 @@
     <main class="page" id="main"></main>
     <script type="module">
       import { inview } from '@ccadran/inview'
-      import { SplitText } from 'gsap/SplitText'
       import { log } from './shared.ts'
 
       // 40 paragraphes découpés en lignes, callback sans retour : le split est conservé.
@@ -25,7 +24,6 @@
         main.append(p)
       }
 
-      inview.use(SplitText)
       window.off = inview.on('p', { split: { type: 'lines' } }, ({ el }) => {
         log(`trigger ${el.id}`)
         el.classList.add('is-in')

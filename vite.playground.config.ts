@@ -6,6 +6,9 @@ export default defineConfig({
   root: 'playground',
   server: { port: 5173, strictPort: true },
   resolve: {
-    alias: { '@ccadran/inview': resolve(import.meta.dirname, 'src/index.ts') },
+    alias: [
+      { find: '@ccadran/inview/vue', replacement: resolve(import.meta.dirname, 'src/vue.ts') },
+      { find: '@ccadran/inview', replacement: resolve(import.meta.dirname, 'src/index.ts') },
+    ],
   },
 })

@@ -45,7 +45,6 @@ const scrollThrough = (page) =>
 
 const linesWithGsap = (page) =>
   page.evaluate(() => {
-    inview.use(SplitText)
     makeParagraphs(200, 's', 60)
     inview.on('s', { split: { type: 'lines' } }, ({ lines }) =>
       gsap.fromTo(lines, { yPercent: 100 }, { yPercent: 0, duration: 0.2 }),
@@ -54,7 +53,6 @@ const linesWithGsap = (page) =>
 
 const linesNoReturn = (page) =>
   page.evaluate(() => {
-    inview.use(SplitText)
     makeParagraphs(200, 's', 60)
     inview.on('s', { split: { type: 'lines' } }, ({ el }) => {
       el.classList.add('is-in')

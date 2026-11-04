@@ -18,8 +18,8 @@
         --word. Après un redécoupage, les nouveaux mots prennent directement leur état final.
       </p>
       <div class="spacer"></div>
-      <p class="block" data-inview="again" id="again">
-        Avec replay, le split est conservé pour pouvoir rejouer l'animation à chaque passage.
+      <p class="big" data-inview="again" id="again">
+        split + replay : remonte au-dessus de la ligne puis redescends, les lignes se rejouent.
       </p>
       <div class="spacer"></div>
     </main>
@@ -35,10 +35,9 @@
     <script type="module">
       import { inview } from '@ccadran/inview'
       import gsap from 'gsap'
-      import { SplitText } from 'gsap/SplitText'
-      import { log } from './shared.ts'
+      import { drawStartLine, log } from './shared.ts'
 
-      inview.use(SplitText)
+      drawStartLine(20)
 
       inview.on('title', { start: 20, split: { type: 'lines', mask: 'lines' } }, ({ el, lines }) => {
         log(`trigger ${el.id} (${lines.length} lignes)`)
@@ -55,7 +54,7 @@
       )
       inview.on('again', { start: 20, replay: true, split: { type: 'lines' } }, ({ el, lines }) => {
         log(`trigger ${el.id}`)
-        return gsap.fromTo(lines, { y: 30, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.4, stagger: 0.05 })
+        return gsap.fromTo(lines, { y: 60, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.8, stagger: 0.08, ease: 'expo.out' })
       })
       window.inview = inview
     </script>

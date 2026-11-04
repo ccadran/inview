@@ -1,6 +1,7 @@
-import type { InviewCallback, InviewOptions, SplitTextLike } from './types';
+import type { InviewCallback, InviewOptions } from './types';
 export declare class Inview {
-    private splitter;
+    /** SplitText est importé par la lib : `gsap` est une peer dependency. */
+    private readonly splitter;
     private readonly registry;
     private readonly elements;
     private readonly triggerObservers;
@@ -16,8 +17,6 @@ export declare class Inview {
     private resizeTimer;
     private fontsBound;
     private readonly onFontsLoaded;
-    /** Enregistre SplitText : `inview.use(SplitText)`. Nécessaire avant tout `on()` avec l'option split. */
-    use(splitter: SplitTextLike): this;
     /**
      * Associe un callback aux éléments `[data-inview="name"]`, présents et futurs.
      * Renvoie une fonction qui retire cet enregistrement.

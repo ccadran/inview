@@ -15,11 +15,9 @@
     <script type="module">
       import { inview } from '@ccadran/inview'
       import gsap from 'gsap'
-      import { SplitText } from 'gsap/SplitText'
 
       window.inview = inview
       window.gsap = gsap
-      window.SplitText = SplitText
       window.__long = []
       new PerformanceObserver((l) => {
         for (const e of l.getEntries()) window.__long.push(Math.round(e.duration))

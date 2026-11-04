@@ -4,9 +4,10 @@ Lance une fonction quand un élément entre dans l'écran — l'alternative lég
 animations **déclenchées** (reveal, fade-in, texte qui monte ligne par ligne…).
 
 - Basée sur `IntersectionObserver` : aucun listener de scroll, aucun calcul de position à chaque frame.
-- Découpage de texte optionnel (lignes, mots, caractères) avec GSAP SplitText.
+- Découpage de texte intégré (lignes, mots, caractères) avec GSAP SplitText, sans configuration.
 - Marche avec le contenu ajouté plus tard (navigation Nuxt, `v-if`, pagination CMS) sans rien faire.
-- Import compatible SSR. ~4 kB gzippé, aucune dépendance obligatoire.
+- Version Vue / Nuxt : dans un composant, `inview.on` ne vise que ses éléments et se retire au démontage.
+- Import compatible SSR. ~4 kB gzippé (plus SplitText, ~4 kB, chargé depuis ton `gsap`).
 
 Ce que la lib **ne fait pas** : le scrub (animation liée à la progression du scroll) et le pin.
 Pour ça, garde ScrollTrigger ou les CSS scroll-driven animations.
@@ -14,14 +15,11 @@ Pour ça, garde ScrollTrigger ou les CSS scroll-driven animations.
 ## Installation
 
 ```sh
-pnpm add github:ccadran/inview#v0.1.0
+pnpm add github:ccadran/inview#v0.2.0 gsap
 ```
 
-Pour découper du texte, il faut aussi GSAP (SplitText est livré dans le package `gsap`) :
-
-```sh
-pnpm add gsap
-```
+`gsap` est une dépendance « peer » : inview utilise le SplitText de ton projet, il n'est pas copié dans la
+lib. Vue n'est nécessaire que si tu utilises `@ccadran/inview/vue`.
 
 ## Démarrage rapide
 
@@ -71,11 +69,12 @@ Le callback part quand le **haut de l'élément** franchit cette ligne.
 
 ## Options
 
-| Option   | Type                | Défaut  | Rôle |
-| -------- | ------------------- | ------- | ---- |
-| `start`  | `number \| '20%'`   | `0`     | Position de la ligne de déclenchement (voir ci-dessus). |
-| `replay` | `boolean`           | `false` | Rejoue le callback à chaque passage : quand l'élément redescend sous la ligne (tu remontes la page), il est réarmé. |
-| `split`  | `SplitOptions`      | —       | Découpe le texte avant l'animation (voir [Découper du texte](#découper-du-texte)). |
+| Option   | Type              | Défaut  | Rôle                                                                                                                   |
+| -------- | ----------------- | ------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `start`  | `number \| '20%'` | `0`     | Position de la ligne de déclenchement (voir ci-dessus).                                                                |
+| `replay` | `boolean`         | `false` | Rejoue le callback à chaque passage : quand tu remontes la page et que l'élément repasse sous la ligne, il est réarmé. |
+| `split`  | `SplitOptions`    | —       | Découpe le texte avant l'animation (voir [Découper du texte](#découper-du-texte)).                                     |
+| `scope`  | `Element`         | page    | Ne vise que les éléments contenus dans cet élément. Avec Vue, automatique dans un composant (voir plus bas).           |
 
 Les options sont facultatives : `inview.on('title', callback)` suffit.
 
@@ -87,19 +86,19 @@ découpé qu'une fois), sinon `on()` lève une erreur.
 
 Il reçoit un objet :
 
-| Propriété | Contenu |
-| --------- | ------- |
-| `el`      | L'élément déclenché. |
+| Propriété                          | Contenu                                                     |
+| ---------------------------------- | ----------------------------------------------------------- |
+| `el`                               | L'élément déclenché.                                        |
 | `lines`, `words`, `chars`, `masks` | Les morceaux du texte découpé. Tableaux vides sans `split`. |
 
 Tu y fais ce que tu veux : ajouter une classe, lancer une animation GSAP, WAAPI, jouer une vidéo…
 **Renvoyer quelque chose est facultatif**, mais ça débloque des comportements en plus quand le texte est découpé :
 
-| Le callback renvoie… | Ce que fait inview |
-| -------------------- | ------------------ |
-| rien                 | Rien de plus. Le texte reste découpé. |
+| Le callback renvoie…                   | Ce que fait inview                                                                                                                                                                                                   |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| rien                                   | Rien de plus. Le texte reste découpé.                                                                                                                                                                                |
 | une animation GSAP (tween ou timeline) | Au resize, les lignes sont refaites : inview rappelle ton callback avec les nouvelles lignes et remet l'animation au même avancement. À la fin de l'animation, le texte d'origine est restauré (sauf avec `replay`). |
-| une promesse         | À sa résolution, le texte d'origine est restauré (sauf avec `replay`). |
+| une promesse                           | À sa résolution, le texte d'origine est restauré (sauf avec `replay`).                                                                                                                                               |
 
 Comme le callback peut être rappelé après un resize, il ne doit faire **que** créer l'animation
 (pas de compteur, pas d'appel réseau…).
@@ -109,14 +108,11 @@ deux animations ne se battent jamais sur les mêmes éléments.
 
 ## Découper du texte
 
-Enregistre SplitText **une fois**, avant les `on()` qui utilisent `split` :
+Ajoute l'option `split`, rien d'autre à configurer :
 
 ```ts
 import { inview } from '@ccadran/inview'
 import gsap from 'gsap'
-import { SplitText } from 'gsap/SplitText'
-
-inview.use(SplitText)
 
 inview.on('title', { start: 20, split: { type: 'lines', mask: 'lines' } }, ({ lines }) =>
   gsap.fromTo(lines, { yPercent: 100 }, { yPercent: 0, stagger: 0.1 }),
@@ -165,38 +161,71 @@ Tant qu'il est absent, cache l'élément :
 Ton animation (par exemple un `gsap.fromTo`) applique son état de départ dans la même frame : rien ne
 s'affiche avant l'animation.
 
-## Avec Nuxt
+## Avec Vue / Nuxt
 
-Enregistre SplitText dans un plugin côté client :
+Dans un projet Vue ou Nuxt, importe `inview` depuis **`@ccadran/inview/vue`**. C'est la même API
+(`on`, `refresh`, `destroy`), avec deux comportements en plus quand `on()` est appelé dans un composant :
 
-```ts
-// plugins/inview.client.ts
-import { inview } from '@ccadran/inview'
-import { SplitText } from 'gsap/SplitText'
-
-export default defineNuxtPlugin(() => {
-  inview.use(SplitText)
-})
-```
-
-Dans un composant, appelle `on()` au montage et la fonction qu'il renvoie au démontage :
+- **Retrait automatique** : l'enregistrement se fait au montage et s'annule au démontage. Aucune variable
+  à garder, rien qui traîne d'une page à l'autre.
+- **Limité au composant** : seuls les éléments `data-inview` du composant sont visés.
 
 ```vue
 <script setup lang="ts">
-import { inview } from '@ccadran/inview'
+import { inview } from '@ccadran/inview/vue'
 import gsap from 'gsap'
 
-let off: (() => void) | undefined
+inview.on('title', { start: 20, split: { type: 'lines', mask: 'lines' } }, ({ lines }) =>
+  gsap.fromTo(lines, { yPercent: 100 }, { yPercent: 0, stagger: 0.1 }),
+)
 
-onMounted(() => {
-  off = inview.on('card', ({ el }) => gsap.fromTo(el, { autoAlpha: 0, y: 40 }, { autoAlpha: 1, y: 0 }))
-})
-onUnmounted(() => off?.())
+inview.on('card', ({ el }) => gsap.fromTo(el, { autoAlpha: 0, y: 40 }, { autoAlpha: 1, y: 0 }))
 </script>
+
+<template>
+  <section>
+    <h2 data-inview="title">Un titre</h2>
+    <div data-inview="card">…</div>
+  </section>
+</template>
 ```
 
-Pour une animation utilisée sur tout le site (tous les paragraphes, par exemple), un seul `on()` dans le
-plugin suffit : les éléments des nouvelles pages sont pris en compte automatiquement.
+### Pourquoi limiter au composant ?
+
+Un composant affiché plusieurs fois exécute son `setup` à chaque fois. Si `Card.vue` est affiché dix fois
+et que chaque `on('card')` visait toute la page, chaque carte aurait dix callbacks : elle serait animée
+dix fois en même temps. Rien ne casserait visiblement, mais le travail serait multiplié par dix.
+Limité au composant, chaque carte n'a que son propre callback.
+
+Conséquence pratique : **tu peux réutiliser le même nom dans des composants différents**, même avec des
+configs de split différentes. Chaque composant ne voit que ses éléments.
+
+### Les cas particuliers
+
+| Situation                                              | Que faire                                                                                                                            |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Le composant a plusieurs racines dans son `<template>` | Mets une ref sur un conteneur et passe `scope: maRef`. Sinon, la recherche se fait dans le parent, avec un avertissement en console. |
+| Un composant doit viser toute la page                  | `scope: false`. Il reste retiré au démontage.                                                                                        |
+| Un parent et un de ses enfants utilisent le même nom   | Donne-leur des noms différents : la zone du parent contient celle de l'enfant, l'élément serait visé deux fois.                      |
+| Annuler avant le démontage                             | `on()` renvoie une fonction d'annulation, comme dans le cœur.                                                                        |
+
+### Les animations communes à tout le site
+
+Pour une animation utilisée partout (tous les paragraphes, par exemple), appelle `inview.on()` une seule
+fois dans un plugin. Hors composant, il vise toute la page et reste actif : les éléments des nouvelles
+pages sont pris en compte automatiquement.
+
+```ts
+// plugins/inview.client.ts
+import { inview } from '@ccadran/inview/vue'
+import gsap from 'gsap'
+
+export default defineNuxtPlugin(() => {
+  inview.on('paragraph', { start: 15, split: { type: 'lines' } }, ({ lines }) =>
+    gsap.fromTo(lines, { autoAlpha: 0, y: 20 }, { autoAlpha: 1, y: 0, stagger: 0.06 }),
+  )
+})
+```
 
 ## Bon à savoir
 
@@ -205,21 +234,27 @@ plugin suffit : les éléments des nouvelles pages sont pris en compte automatiq
   déjà présents sont pris en compte.
 - Sans `replay`, un élément est déclenché une seule fois, même s'il est retiré puis remis dans la page
   (`<KeepAlive>`, déplacement par Vue).
+- Avec `replay`, l'élément n'est réarmé que si tu remontes la page. Une animation qui déplace elle-même
+  l'élément sous la ligne (`y: 60`, `yPercent: 100`…) ne le relance donc pas en boucle.
 - Limite connue : un saut de scroll instantané qui fait passer un élément directement de sous la ligne à
   au-dessus de l'écran (clic sur une ancre, `scrollTo` sans animation) ne le déclenche pas.
-- Côté serveur, `on()` enregistre le callback sans rien exécuter : tu peux importer la lib n'importe où.
+- Côté serveur, `on()` ne fait rien : tu peux importer la lib n'importe où.
 
 ## API
 
-| Méthode | Rôle |
-| ------- | ---- |
+| Méthode                               | Rôle                                                                                               |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | `inview.on(name, options?, callback)` | Associe un callback aux éléments `data-inview="name"`. Renvoie une fonction qui annule cet `on()`. |
-| `inview.use(SplitText)` | Enregistre SplitText. Obligatoire avant un `on()` avec `split`. |
-| `inview.refresh()` | Rescanne la page. Normalement inutile : les ajouts et retraits sont détectés automatiquement. |
-| `inview.destroy(name?)` | Avec un nom : annule tous les `on()` de ce nom. Sans argument : arrête complètement la lib. |
+| `inview.refresh()`                    | Rescanne la page. Normalement inutile : les ajouts et retraits sont détectés automatiquement.      |
+| `inview.destroy(name?)`               | Avec un nom : annule tous les `on()` de ce nom. Sans argument : arrête complètement la lib.        |
 
-`inview` est une instance partagée. Pour une instance séparée : `import { Inview } from '@ccadran/inview'`
-puis `new Inview()`.
+Deux points d'entrée, une seule instance partagée :
+
+- `@ccadran/inview` : le cœur, sans framework (Webflow, site statique…).
+- `@ccadran/inview/vue` : la même API, avec le retrait au démontage et la limite au composant quand `on()`
+  est appelé dans un composant Vue.
+
+Pour une instance séparée du cœur : `import { Inview } from '@ccadran/inview'` puis `new Inview()`.
 
 ## Développement
 

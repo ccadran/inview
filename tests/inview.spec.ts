@@ -227,3 +227,49 @@ test('un élément retiré puis réinséré ne se redéclenche pas', async ({ pa
   await page.waitForTimeout(300)
   expect(await count(page, 'trigger card-1')).toBe(1)
 })
+
+test.describe('replay sans boucle', () => {
+  test('rester sur la ligne ne redéclenche pas en boucle (élément animé en y)', async ({
+    page,
+  }) => {
+    await page.goto('/replay.html')
+    await placeTop(page, '#replay', 21)
+    await expect.poll(() => count(page, 'trigger replay')).toBe(1)
+    await page.waitForTimeout(1500)
+    expect(await count(page, 'trigger replay')).toBe(1)
+  })
+
+  test('split + replay : rejoue en remontant, garde le split, sans boucle', async ({ page }) => {
+    await page.goto('/split.html')
+    await placeTop(page, '#again', 21)
+    await expect.poll(() => count(page, 'trigger again')).toBe(1)
+    await page.waitForTimeout(1500)
+    expect(await count(page, 'trigger again')).toBe(1)
+
+    await placeTop(page, '#again', 5)
+    await page.waitForTimeout(150)
+    await placeTop(page, '#again', 50)
+    await expect.poll(() => count(page, 'trigger again')).toBe(2)
+    await page.waitForTimeout(1500)
+    expect(await page.locator('#again > div').count()).toBeGreaterThan(0)
+  })
+})
+
+test('vue : inview.on dans un composant vise ses éléments, même nom réutilisable, retiré au démontage', async ({
+  page,
+}) => {
+  type Priv = { inview: { registry: Map<string, unknown[]> } }
+  const regs = () =>
+    page.evaluate(() => (window as unknown as Priv).inview.registry.get('title')?.length ?? 0)
+  const ids = ['a', 'b', 'c', 'hero']
+  await page.goto('/vue.html')
+  for (const id of ids) await expect.poll(() => count(page, `trigger ${id}`)).toBe(1)
+  await page.waitForTimeout(300)
+  for (const id of ids) expect(await count(page, `trigger ${id}`)).toBe(1)
+  expect(await regs()).toBe(4)
+
+  await page.click('#toggle')
+  await expect.poll(regs).toBe(0)
+  await page.click('#toggle')
+  for (const id of ids) await expect.poll(() => count(page, `trigger ${id}`)).toBe(2)
+})

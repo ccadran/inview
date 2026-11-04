@@ -1,3 +1,4 @@
+import { SplitText } from 'gsap/SplitText'
 import type {
   InviewCallback,
   InviewItem,
@@ -24,6 +25,7 @@ interface Registration {
   replay: boolean
   split: SplitOptions | undefined
   splitKey: string
+  scope: Element | undefined
   cb: InviewCallback
 }
 
@@ -41,6 +43,8 @@ interface RegState {
   anim: GsapAnimation | undefined
   /** Invalide les fins d'animation obsolètes (replay, redécoupage). */
   token: number
+  /** Position de scroll au déclenchement : replay ne réarme que si l'on est remonté au-dessus. */
+  scrollY: number
 }
 
 interface ElementState {
@@ -114,6 +118,11 @@ const fragmentsOf = (split: SplitTextInstance): Omit<InviewItem, 'el'> => ({
   masks: [...split.masks] as HTMLElement[],
 })
 
+const inScope = (reg: Registration, el: Element): boolean => !reg.scope || reg.scope.contains(el)
+
+const scopesOverlap = (a: Registration, b: Registration): boolean =>
+  !a.scope || !b.scope || a.scope.contains(b.scope) || b.scope.contains(a.scope)
+
 const nameOf = (el: Element): string => el.getAttribute(ATTR)?.trim() ?? ''
 
 const fontsLoading = (): boolean =>
@@ -151,7 +160,8 @@ const isNeutral = (split: SplitTextInstance): boolean => {
 }
 
 export class Inview {
-  private splitter: SplitTextLike | undefined
+  /** SplitText est importé par la lib : `gsap` est une peer dependency. */
+  private readonly splitter = SplitText as unknown as SplitTextLike
   private readonly registry = new Map<string, Registration[]>()
   private readonly elements = new Map<HTMLElement, ElementState>()
   private readonly triggerObservers = new Map<number, IntersectionObserver>()
@@ -170,12 +180,6 @@ export class Inview {
     this.markLinesDirty(false)
     // Les découpages anticipés mis en attente pendant le chargement peuvent reprendre.
     this.scheduleQueue()
-  }
-
-  /** Enregistre SplitText : `inview.use(SplitText)`. Nécessaire avant tout `on()` avec l'option split. */
-  use(splitter: SplitTextLike): this {
-    this.splitter = splitter
-    return this
   }
 
   /**
@@ -199,32 +203,32 @@ export class Inview {
       replay: options.replay ?? false,
       split: options.split,
       splitKey: splitKeyOf(options.split),
+      scope: options.scope ?? undefined,
       cb,
     }
 
-    if (reg.split && !this.splitter) {
-      throw new Error(
-        `[inview] "${name}" demande un split mais SplitText n'est pas enregistré : appelle inview.use(SplitText) avant on().`,
-      )
-    }
+    // Côté serveur (SSR) : rien n'est enregistré, l'instance est partagée entre les requêtes.
+    if (!isBrowser()) return () => {}
 
     const existing = this.registry.get(name) ?? []
-    if (existing.some((r) => r.splitKey !== reg.splitKey)) {
+    // Deux configs de split différentes ne posent problème que si elles visent les mêmes éléments.
+    if (existing.some((r) => r.splitKey !== reg.splitKey && scopesOverlap(r, reg))) {
       throw new Error(
-        `[inview] "${name}" a déjà une config de split différente. Un élément ne peut être découpé qu'une fois : utilise la même config de split pour tous les on("${name}").`,
+        `[inview] "${name}" a déjà une config de split différente sur les mêmes éléments. Un élément ne peut être découpé qu'une fois : utilise la même config de split, ou un autre nom.`,
       )
     }
     existing.push(reg)
     this.registry.set(name, existing)
 
-    // Côté serveur (SSR) : on garde l'enregistrement, rien d'autre.
-    if (!isBrowser()) return () => this.removeRegistration(reg)
-
     this.startMutationObserver()
     for (const state of this.elements.values()) {
-      if (state.name === name) this.attachRegistration(state, reg)
+      if (state.name === name && inScope(reg, state.el)) this.attachRegistration(state, reg)
     }
-    for (const el of document.querySelectorAll<HTMLElement>(`[${ATTR}="${CSS.escape(name)}"]`)) {
+    const selector = `[${ATTR}="${CSS.escape(name)}"]`
+    const root = reg.scope ?? document
+    const found = [...root.querySelectorAll<HTMLElement>(selector)]
+    if (reg.scope instanceof HTMLElement && reg.scope.matches(selector)) found.unshift(reg.scope)
+    for (const el of found) {
       if (!this.elements.has(el)) this.track(el)
     }
 
@@ -282,6 +286,7 @@ export class Inview {
       finished: alreadyPlayed,
       anim: undefined,
       token: 0,
+      scrollY: 0,
     })
     if (alreadyPlayed) return
     this.getTriggerObserver(reg.start).observe(state.el)
@@ -317,7 +322,7 @@ export class Inview {
 
   private track(el: HTMLElement): void {
     const name = nameOf(el)
-    const regs = this.registry.get(name)
+    const regs = this.registry.get(name)?.filter((reg) => inScope(reg, el))
     // Un élément sans callback enregistré n'est pas observé.
     if (!regs || regs.length === 0 || this.elements.has(el)) return
     const split = this.splits.get(el)
@@ -481,7 +486,11 @@ export class Inview {
       for (const [reg, rs] of state.regs) {
         if (reg.start !== start) continue
         if (reached && !rs.triggered) this.trigger(state, reg, rs)
-        else if (below && rs.triggered && reg.replay) rs.triggered = false
+        // Réarmement seulement si l'utilisateur est remonté : une animation qui déplace
+        // l'élément sous la ligne (y: 60…) ne doit pas le redéclencher en boucle.
+        else if (below && rs.triggered && reg.replay && window.scrollY < rs.scrollY) {
+          rs.triggered = false
+        }
       }
 
       // L'élément a peut-être été retiré par le callback lui-même.
@@ -497,6 +506,7 @@ export class Inview {
     // Replay : on coupe l'animation précédente pour éviter deux tweens sur les mêmes cibles.
     rs.anim?.kill()
     rs.triggered = true
+    rs.scrollY = window.scrollY
     let set = this.played.get(state.el)
     if (!set) {
       set = new WeakSet()
@@ -565,7 +575,7 @@ export class Inview {
   /** Découpe l'élément, ou refait ses lignes si elles sont obsolètes. */
   private splitNow(state: ElementState): void {
     this.queue.delete(state)
-    if (!this.splitter || !state.config) return
+    if (!state.config) return
     if (state.split) {
       if (!state.dirty) return
       state.dirty = false
